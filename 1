@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>闪卡记忆 - Flashcard Master</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --green: #10b981;
+      --red: #ef4444;
+      --red-hover: #dc2626;
+      --green-hover: #059669;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow-x: hidden;
+    }
+
+    #app {
+      width: 100%;
+      max-width: 420px;
+      height: 100vh;
+      max-height: 860px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      background: #0f172a;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+    }
+
+    @media (min-height: 800px) and (min-width: 430px) {
+      #app {
+        height: 92vh;
+        border-radius: 32px;
+        border: 1px solid var(--card-border);
+      }
+    }
+
+    /* 头部 Header */
+    .header {
+      padding: 18px 20px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .icon-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 18px;
+      transition: all 0.2s;
+    }
+
+    .icon-btn:active {
+      transform: scale(0.92);
+    }
+
+    .deck-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-main);
+      text-align: center;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin: 0 10px;
+    }
+
+    /* 视图切换 */
+    .view {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      padding: 10px 20px 20px;
+      position: relative;
+      height: calc(100% - 68px);
+    }
+
+    .view.active {
+      display: flex;
+    }
+
+    /* 1. 首页 Deck Selection */
+    .deck-list {
+      flex: 1;
+      overflow-y: auto;
+      margin-top: 10px;
+      padding-right: 4px;
+    }
+
+    .deck-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 18px 20px;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .deck-card:active {
+      transform: scale(0.98);
+      border-color: var(--accent);
+    }
+
+    .deck-info h3 {
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+
+    .deck-info p {
+      font-size: 13px;
+      color: var(--text-sub);
+    }
+
+    .start-btn-sm {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .add-deck-btn {
+      background: transparent;
+      border: 2px dashed var(--card-border);
+      color: var(--text-sub);
+      border-radius: 18px;
+      padding: 16px;
+      width: 100%;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 5px;
+    }
+
+    /* 2. 复习卡片界面 */
+    .progress-bar-container {
+      width: 100%;
+      height: 6px;
+      background: var(--card-bg);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #818cf8);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .card-container {
+      flex: 1;
+      perspective: 1000px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .flashcard {
+      width: 100%;
+      height: 100%;
+      max-height: 420px;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+      cursor: pointer;
+    }
+
+    .flashcard.flipped {
+      transform: rotateY(180deg);
+    }
+
+    .card-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+      text-align: center;
+    }
+
+    .card-back {
+      transform: rotateY(180deg);
+      background: #1c2333;
+    }
+
+    .word-text {
+      font-size: 32px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 8px;
+      word-break: break-word;
+    }
+
+    .pos-tag {
+      display: inline-block;
+      font-size: 12px;
+      background: rgba(99, 102, 241, 0.2);
+      color: #818cf8;
+      padding: 3px 8px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+
+    .phonetic {
+      font-size: 15px;
+      color: var(--text-sub);
+      margin-bottom: 16px;
+    }
+
+    .audio-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: none;
+      color: var(--text-main);
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 20px;
+      transition: background 0.2s;
+    }
+
+    .audio-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .flip-hint {
+      position: absolute;
+      bottom: 20px;
+      font-size: 12px;
+      color: var(--text-sub);
+      opacity: 0.6;
+    }
+
+    .meaning {
+      font-size: 22px;
+      font-weight: 600;
+      color: #4ade80;
+      margin-bottom: 16px;
+    }
+
+    /* 底部按钮控制区 */
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      height: 64px;
+    }
+
+    .btn-action {
+      border: none;
+      border-radius: 16px;
+      font-size: 18px;
+      font-weight: 700;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-know {
+      background: var(--green);
+    }
+    .btn-know:active {
+      background: var(--green-hover);
+      transform: scale(0.96);
+    }
+
+    .btn-forgot {
+      background: var(--red);
+    }
+    .btn-forgot:active {
+      background: var(--red-hover);
+      transform: scale(0.96);
+    }
+
+    /* 3. 结算界面 */
+    .summary-box {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    .summary-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+
+    .summary-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .summary-stats {
+      display: flex;
+      gap: 20px;
+      margin: 24px 0;
+      width: 100%;
+    }
+
+    .stat-card {
+      flex: 1;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .stat-num {
+      font-size: 28px;
+      font-weight: 700;
+    }
+    .stat-num.green { color: var(--green); }
+    .stat-num.red { color: var(--red); }
+
+    .stat-label {
+      font-size: 13px;
+      color: var(--text-sub);
+      margin-top: 4px;
+    }
+
+    .summary-actions {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 16px;
+      border-radius: 16px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary {
+      background: var(--card-bg);
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 16px;
+      border-radius: 16px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* 4. 弹窗 Modal */
+    .modal {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 360px;
+      padding: 24px;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .modal-input, .modal-textarea {
+      width: 100%;
+      background: var(--bg-color);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 12px;
+      border-radius: 10px;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+
+    .modal-textarea {
+      height: 120px;
+      resize: none;
+    }
+
+    .modal-btns {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .btn-text {
+      background: transparent;
+      border: none;
+      color: var(--text-sub);
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .btn-text.primary {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .format-hint {
+      font-size: 11px;
+      color: var(--text-sub);
+      margin-bottom: 12px;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <!-- 头部导航 -->
+  <div class="header">
+    <button class="icon-btn" id="backBtn" style="visibility: hidden;">←</button>
+    <div class="deck-title" id="headerTitle">闪卡记忆库</div>
+    <button class="icon-btn" id="addWordBtn" style="visibility: hidden;">+</button>
+  </div>
+
+  <!-- 1. 词库选择界面 -->
+  <div class="view active" id="deckView">
+    <div class="deck-list" id="deckList">
+      <!-- 动态插入词库 -->
+    </div>
+    <button class="add-deck-btn" id="createDeckBtn">+ 新建词库 (Import New Deck)</button>
+  </div>
+
+  <!-- 2. 卡片复习界面 -->
+  <div class="view" id="reviewView">
+    <div class="progress-bar-container">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="card-container">
+      <div class="flashcard" id="flashcard">
+        <!-- 正面 -->
+        <div class="card-face card-front">
+          <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+            <div class="word-text" id="frontWord">loading...</div>
+            <div>
+              <span class="pos-tag" id="frontPos">adj.</span>
+            </div>
+            <div class="phonetic" id="frontPhonetic">/ /</div>
+            <button class="audio-btn" id="audioBtn" onclick="event.stopPropagation(); playAudio();">🔊</button>
+          </div>
+          <div class="flip-hint">点击卡片翻面查看释义 👆</div>
+        </div>
+        <!-- 背面 -->
+        <div class="card-face card-back">
+          <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+            <div class="meaning" id="backMeaning">中文释义</div>
+            <div style="font-size: 13px; color: var(--text-sub);" id="backWordRef">word</div>
+          </div>
+          <div class="flip-hint">点击卡片再次翻面 👆</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn-action btn-forgot" onclick="markCard(false)">✕ 不会</button>
+      <button class="btn-action btn-know" onclick="markCard(true)">✓ 会了</button>
+    </div>
+  </div>
+
+  <!-- 3. 本轮结束结算界面 -->
+  <div class="view" id="summaryView">
+    <div class="summary-box">
+      <div class="summary-icon">🎉</div>
+      <div class="summary-title">太棒了！完成本轮复习</div>
+      <p style="color: var(--text-sub); font-size: 14px;">坚持复习是记牢生词的最佳途径</p>
+
+      <div class="summary-stats">
+        <div class="stat-card">
+          <div class="stat-num green" id="statKnow">0</div>
+          <div class="stat-label">已掌握</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num red" id="statForgot">0</div>
+          <div class="stat-label">需要巩固</div>
+        </div>
+      </div>
+
+      <div class="summary-actions">
+        <button class="btn-primary" id="reviewForgotBtn" onclick="startReviewForgot()">仅复习“不会”的单词</button>
+        <button class="btn-secondary" onclick="restartDeck()">重新复习全套词库</button>
+        <button class="btn-secondary" onclick="switchView('deckView')" style="border:none; background:transparent; color: var(--text-sub);">返回词库列表</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 弹窗：创建新词库 -->
+  <div class="modal" id="addDeckModal">
+    <div class="modal-content">
+      <div class="modal-title">新建词库</div>
+      <input type="text" class="modal-input" id="deckNameInput" placeholder="词库名称 (如: Test Three / Unit 5)">
+      <div class="format-hint">
+        快速批量导入格式（每行一个）：<br>
+        <b>单词 | 词性 | 音标 | 中文释义</b><br>
+        例如：<br>
+        futuristic | adj. | /ˈfjuː.tʃəˈrɪs.tɪk/ | 未来的，极现代化的
+      </div>
+      <textarea class="modal-textarea" id="deckWordsInput" placeholder="可以直接贴入上面的文本格式..."></textarea>
+      <div class="modal-btns">
+        <button class="btn-text" onclick="closeModal('addDeckModal')">取消</button>
+        <button class="btn-text primary" onclick="saveNewDeck()">创建并保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 预置初始词库：Test Two
+  const defaultDecks = {
+    "test_two": {
+      id: "test_two",
+      name: "Test Two",
+      words: [
+        { word: "execute", pos: "v.", phonetic: "", meaning: "执行；实施" },
+        { word: "enhance", pos: "v.", phonetic: "", meaning: "提高；增强" },
+        { word: "hazard", pos: "n.", phonetic: "", meaning: "危险；隐患" },
+        { word: "intricate", pos: "adj.", phonetic: "", meaning: "错综复杂的；精密的" },
+        { word: "customize", pos: "v.", phonetic: "", meaning: "定制；改制" },
+        { word: "safeguard", pos: "v.", phonetic: "", meaning: "保护；捍卫" },
+        { word: "accountability", pos: "n.", phonetic: "", meaning: "问责性；有义务" },
+        { word: "autonomy", pos: "n.", phonetic: "", meaning: "自主权；自治" },
+        { word: "bias", pos: "n./v.", phonetic: "", meaning: "偏见；使有偏见" },
+        { word: "mimic", pos: "v.", phonetic: "", meaning: "模仿；拟态" },
+        { word: "diversity", pos: "n.", phonetic: "", meaning: "多样性" },
+        { word: "transparent", pos: "adj.", phonetic: "", meaning: "透明的；坦率的" },
+        { word: "futuristic", pos: "adj.", phonetic: "/ˈfjuː.tʃəˈrɪs.tɪk/", meaning: "未来的，极现代化的" },
+        { word: "revolutionize", pos: "v.", phonetic: "/ˌrev.əˈluː.ʃən.aɪz/", meaning: "彻底变革" },
+        { word: "navigate", pos: "v.", phonetic: "/ˈnæv.ɪ.ɡeɪt/", meaning: "导航；定向" },
+        { word: "ethnic", pos: "n.", phonetic: "/ˈeθ.nɪk/", meaning: "种族的；民族的" },
+        { word: "distract", pos: "v.", phonetic: "/dɪˈstrækt/", meaning: "使分心；转移注意力" },
+        { word: "approximately", pos: "adv.", phonetic: "/əˈprɒk.sɪ.mət.li/", meaning: "大约；近乎" },
+        { word: "eliminate", pos: "v.", phonetic: "/ɪˈlɪm.ɪ.neɪt/", meaning: "消除；根除" },
+        { word: "optimize", pos: "v.", phonetic: "/ˈɒp.tɪ.maɪz/", meaning: "优化；使最优化" },
+        { word: "congestion", pos: "n.", phonetic: "/kənˈdʒes.tʃən/", meaning: "拥堵；堵塞" },
+        { word: "emission", pos: "n.", phonetic: "/iˈmɪʃ.ən/", meaning: "排放；散发" },
+        { word: "accessibility", pos: "n.", phonetic: "/əkˌses.əˈbɪl.ə.ti/", meaning: "易接近性；可用性" },
+        { word: "dominate", pos: "v.", phonetic: "/ˈdɒm.ɪ.neɪt/", meaning: "主导；支配" },
+        { word: "dilemma", pos: "n.", phonetic: "/daɪˈlem.ə/", meaning: "两难境地；困境" },
+        { word: "prioritize", pos: "v.", phonetic: "/praɪˈɒr.ɪ.taɪz/", meaning: "优先考虑；按优先级处理" },
+        { word: "transition", pos: "n.", phonetic: "/trænˈzɪʃ.ən/", meaning: "过渡；转变" },
+        { word: "hurdle", pos: "n.", phonetic: "/ˈhɜː.dəl/", meaning: "障碍；栏架" },
+        { word: "construction site/worker", pos: "phr.", phonetic: "", meaning: "工地 / 工地工人" },
+        { word: "credit card", pos: "phr.", phonetic: "", meaning: "信用卡" },
+        { word: "call for (a doctor)", pos: "phr.", phonetic: "", meaning: "去叫(某人)到某处" },
+        { word: "call on", pos: "phr.", phonetic: "", meaning: "拜访(某人)访问城市" },
+        { word: "care for", pos: "phr.", phonetic: "", meaning: "喜欢；看护" },
+        { word: "carry out/carry on", pos: "phr.", phonetic: "", meaning: "执行，进行" },
+        { word: "catch hold of", pos: "phr.", phonetic: "", meaning: "抓住，握住" },
+        { word: "have/suffer from/catch a cold", pos: "phr.", phonetic: "", meaning: "患上感冒" },
+        { word: "catch up with", pos: "phr.", phonetic: "", meaning: "赶上某人，跟上某人" },
+        { word: "calm down", pos: "phr.", phonetic: "", meaning: "冷静" },
+        { word: "be free of charge", pos: "phr.", phonetic: "", meaning: "免费" },
+        { word: "come into being", pos: "phr.", phonetic: "", meaning: "产生，成立" },
+        { word: "come true", pos: "phr.", phonetic: "", meaning: "实现" },
+        { word: "come to an end", pos: "phr.", phonetic: "", meaning: "结束" },
+        { word: "come across", pos: "phr.", phonetic: "", meaning: "(偶然) 碰见" },
+        { word: "make a comment on/no comment", pos: "phr.", phonetic: "", meaning: "评论/不予置评" },
+        { word: "have sth/nothing in common", pos: "phr.", phonetic: "", meaning: "有/没有共同之处" },
+        { word: "draw a conclusion", pos: "phr.", phonetic: "", meaning: "得出结论" },
+        { word: "connect with", pos: "phr.", phonetic: "", meaning: "与...连接" },
+        { word: "on the contrary", pos: "phr.", phonetic: "", meaning: "相反地" },
+        { word: "be under control", pos: "phr.", phonetic: "", meaning: "控制住" },
+        { word: "be out of control", pos: "phr.", phonetic: "", meaning: "失控" },
+        { word: "contribute to/devote to", pos: "phr.", phonetic: "", meaning: "把...贡献给" },
+        { word: "consist of/be composed of/comprise of", pos: "phr.", phonetic: "", meaning: "由...构成" },
+        { word: "consult /look up the dictionary", pos: "phr.", phonetic: "", meaning: "查词典" },
+        { word: "be confident of / have confidence in", pos: "phr.", phonetic: "", meaning: "对...有信心" },
+        { word: "compete with sb. for sth.", pos: "phr.", phonetic: "", meaning: "与某人竞争某事" },
+        { word: "charity fund", pos: "phr.", phonetic: "", meaning: "慈善基金" },
+        { word: "(opening) closing ceremony", pos: "phr.", phonetic: "", meaning: "开幕/闭幕" },
+        { word: "put...into consideration", pos: "phr.", phonetic: "", meaning: "予以考虑" },
+        { word: "congratulate on", pos: "phr.", phonetic: "", meaning: "道贺" },
+        { word: "die from cold (hunger)", pos: "phr.", phonetic: "", meaning: "冻死，饿死" },
+        { word: "depend on/ rely on", pos: "phr.", phonetic: "", meaning: "依赖" },
+        { word: "deal with", pos: "phr.", phonetic: "", meaning: "处理，对待" },
+        { word: "have difficulty in", pos: "phr.", phonetic: "", meaning: "在做...费劲，有困难" },
+        { word: "be different from", pos: "phr.", phonetic: "", meaning: "不同于" },
+        { word: "be similar to/ be the same as", pos: "phr.", phonetic: "", meaning: "类似/相同" },
+        { word: "in the distance", pos: "phr.", phonetic: "", meaning: "在远处" },
+        { word: "do cleaning/ go shopping", pos: "phr.", phonetic: "", meaning: "搞清洁/去购物" },
+        { word: "be defined as", pos: "phr.", phonetic: "", meaning: "被定义为" },
+        { word: "have (sth./ nothing) to do with", pos: "phr.", phonetic: "", meaning: "与...有关/无关" },
+        { word: "do away with/ get rid of", pos: "phr.", phonetic: "", meaning: "消除" },
+        { word: "drop in on sb.", pos: "phr.", phonetic: "", meaning: "顺便看望某人（某处）" },
+        { word: "on duty", pos: "phr.", phonetic: "", meaning: "值班，值日" },
+        { word: "make an experiment(s)", pos: "phr.", phonetic: "", meaning: "做实验" },
+        { word: "be entitled to", pos: "phr.", phonetic: "", meaning: "有...的资格" },
+        { word: "with ease", pos: "phr.", phonetic: "", meaning: "轻易地" },
+        { word: "at ease", pos: "phr.", phonetic: "", meaning: "自由自在地" },
+        { word: "make an effort (s)", pos: "phr.", phonetic: "", meaning: "做出努力" },
+        { word: "without emotion", pos: "phr.", phonetic: "", meaning: "无动于衷" },
+        { word: "lay/place emphasis on/ upon emphasize on", pos: "phr.", phonetic: "", meaning: "强调" },
+        { word: "environmentally friendly", pos: "phr.", phonetic: "", meaning: "环保" },
+        { word: "enjoy oneself / have a good time", pos: "phr.", phonetic: "", meaning: "过得快乐，玩得开心" },
+        { word: "endanger one's life", pos: "phr.", phonetic: "", meaning: "危及生命" },
+        { word: "expected salary", pos: "phr.", phonetic: "", meaning: "期望薪酬" },
+        { word: "enforce the law", pos: "phr.", phonetic: "", meaning: "执行法律" },
+        { word: "put an end to sth.", pos: "phr.", phonetic: "", meaning: "终止某事" },
+        { word: "an entrance to...", pos: "phr.", phonetic: "", meaning: "在...人口" },
+        { word: "engage in", pos: "phr.", phonetic: "", meaning: "从事于" },
+        { word: "to a large extent", pos: "phr.", phonetic: "", meaning: "很大程度上" },
+        { word: "the equality between sexes", pos: "phr.", phonetic: "", meaning: "男女平等" },
+        { word: "be equipped with", pos: "phr.", phonetic: "", meaning: "用...装备" },
+        { word: "examine one's eyes", pos: "phr.", phonetic: "", meaning: "检查眼睛" },
+        { word: "have a physical examination", pos: "phr.", phonetic: "", meaning: "进行体检" },
+        { word: "set an example to", pos: "phr.", phonetic: "", meaning: "为...树立榜样" },
+        { word: "follow one's example", pos: "phr.", phonetic: "", meaning: "以...为榜样" },
+        { word: "exhibit one's courage", pos: "phr.", phonetic: "", meaning: "表现出勇气" },
+        { word: "explain to sb. for sth.", pos: "phr.", phonetic: "", meaning: "向某人解释某事" }
+      ]
+    }
+  };
+
+  // 应用状态管理
+  let decks = JSON.parse(localStorage.getItem('flashcard_decks')) || defaultDecks;
+  let currentDeckId = null;
+  let currentQueue = [];
+  let currentIndex = 0;
+  let knowList = [];
+  let forgotList = [];
+  let isFlipped = false;
+
+  // DOM 节点引用
+  const deckView = document.getElementById('deckView');
+  const reviewView = document.getElementById('reviewView');
+  const summaryView = document.getElementById('summaryView');
+  const headerTitle = document.getElementById('headerTitle');
+  const backBtn = document.getElementById('backBtn');
+  const flashcard = document.getElementById('flashcard');
+
+  // 初始化
+  function init() {
+    saveToStorage();
+    renderDecks();
+
+    document.getElementById('createDeckBtn').addEventListener('click', () => {
+      document.getElementById('addDeckModal').classList.add('active');
+    });
+
+    backBtn.addEventListener('click', () => {
+      switchView('deckView');
+    });
+
+    flashcard.addEventListener('click', () => {
+      isFlipped = !isFlipped;
+      flashcard.classList.toggle('flipped', isFlipped);
+    });
+  }
+
+  function saveToStorage() {
+    localStorage.setItem('flashcard_decks', JSON.stringify(decks));
+  }
+
+  function renderDecks() {
+    const deckList = document.getElementById('deckList');
+    deckList.innerHTML = '';
+
+    Object.values(decks).forEach(deck => {
+      const card = document.createElement('div');
+      card.className = 'deck-card';
+      card.innerHTML = `
+        <div class="deck-info">
+          <h3>${deck.name}</h3>
+          <p>${deck.words.length} 个词汇 / 短语</p>
+        </div>
+        <button class="start-btn-sm">开始复习</button>
+      `;
+      card.onclick = () => startDeck(deck.id);
+      deckList.appendChild(card);
+    });
+  }
+
+  function switchView(viewName) {
+    [deckView, reviewView, summaryView].forEach(v => v.classList.remove('active'));
+
+    if (viewName === 'deckView') {
+      deckView.classList.add('active');
+      headerTitle.textContent = "闪卡记忆库";
+      backBtn.style.visibility = 'hidden';
+      renderDecks();
+    } else if (viewName === 'reviewView') {
+      reviewView.classList.add('active');
+      headerTitle.textContent = decks[currentDeckId].name;
+      backBtn.style.visibility = 'visible';
+    } else if (viewName === 'summaryView') {
+      summaryView.classList.add('active');
+      headerTitle.textContent = "复习完成";
+      backBtn.style.visibility = 'visible';
+    }
+  }
+
+  function startDeck(deckId) {
+    currentDeckId = deckId;
+    currentQueue = [...decks[deckId].words];
+    currentIndex = 0;
+    knowList = [];
+    forgotList = [];
+    switchView('reviewView');
+    loadCard();
+  }
+
+  function loadCard() {
+    if (currentIndex >= currentQueue.length) {
+      showSummary();
+      return;
+    }
+
+    isFlipped = false;
+    flashcard.classList.remove('flipped');
+
+    const item = currentQueue[currentIndex];
+    
+    // 更新内容
+    document.getElementById('frontWord').textContent = item.word;
+    document.getElementById('frontPos').textContent = item.pos || 'word';
+    document.getElementById('frontPhonetic').textContent = item.phonetic || '';
+    document.getElementById('backMeaning').textContent = item.meaning;
+    document.getElementById('backWordRef').textContent = item.word;
+
+    // 隐藏/显示音标
+    document.getElementById('frontPhonetic').style.display = item.phonetic ? 'block' : 'none';
+
+    // 进度条更新
+    const progressPct = ((currentIndex) / currentQueue.length) * 100;
+    document.getElementById('progressBar').style.width = `${progressPct}%`;
+  }
+
+  function markCard(isKnow) {
+    const currentWord = currentQueue[currentIndex];
+    if (isKnow) {
+      knowList.push(currentWord);
+    } else {
+      forgotList.push(currentWord);
+    }
+
+    currentIndex++;
+    loadCard();
+  }
+
+  function showSummary() {
+    document.getElementById('progressBar').style.width = '100%';
+    document.getElementById('statKnow').textContent = knowList.length;
+    document.getElementById('statForgot').textContent = forgotList.length;
+
+    const reviewForgotBtn = document.getElementById('reviewForgotBtn');
+    if (forgotList.length === 0) {
+      reviewForgotBtn.style.display = 'none';
+    } else {
+      reviewForgotBtn.style.display = 'block';
+    }
+
+    switchView('summaryView');
+  }
+
+  function startReviewForgot() {
+    currentQueue = [...forgotList];
+    currentIndex = 0;
+    knowList = [];
+    forgotList = [];
+    switchView('reviewView');
+    loadCard();
+  }
+
+  function restartDeck() {
+    startDeck(currentDeckId);
+  }
+
+  function playAudio() {
+    const word = currentQueue[currentIndex]?.word;
+    if (!word) return;
+    const utterance = new SpeechSynthesisUtterance(word);
+    utterance.lang = 'en-US';
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('active');
+  }
+
+  function saveNewDeck() {
+    const name = document.getElementById('deckNameInput').value.trim();
+    const rawText = document.getElementById('deckWordsInput').value.trim();
+
+    if (!name) {
+      alert('请输入词库名称');
+      return;
+    }
+
+    const lines = rawText.split('\n');
+    const words = [];
+
+    lines.forEach(line => {
+      if (!line.trim()) return;
+      const parts = line.split('|').map(s => s.trim());
+      if (parts.length >= 2) {
+        words.push({
+          word: parts[0],
+          pos: parts[1] || '',
+          phonetic: parts[2] || '',
+          meaning: parts[3] || parts[1] // 如果只传了 2 个参数，第2个作为中文
+        });
+      } else {
+        // 普通格式兼容
+        words.push({
+          word: line.trim(),
+          pos: '',
+          phonetic: '',
+          meaning: '未添加释义'
+        });
+      }
+    });
+
+    if (words.length === 0) {
+      alert('请输入有效生词');
+      return;
+    }
+
+    const newId = 'deck_' + Date.now();
+    decks[newId] = {
+      id: newId,
+      name: name,
+      words: words
+    };
+
+    saveToStorage();
+    closeModal('addDeckModal');
+    document.getElementById('deckNameInput').value = '';
+    document.getElementById('deckWordsInput').value = '';
+    renderDecks();
+  }
+
+  // 页面启动
+  init();
+</script>
+</body>
+</html>
